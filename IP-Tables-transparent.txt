@@ -1,0 +1,45 @@
+# Calvin Köcher custom IP-Tables- transprent Proxy redirect, based on consul connect
+#
+# apt-get install iptables-persistent
+# nano /etc/iptables/rules.v4
+# iptables-restore < /etc/iptables/rules.v4
+# iptables --table nat -L 
+# tail -f /var/log/messages
+# sudo iptables -F --table nat
+# sudo apt install resolvconf
+# sudo nano /etc/resolvconf/resolv.conf.d/head
+# nameserver 127.0.0.1
+# cat /etc/resolv.conf
+
+*nat
+# Default Policy
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# Create Consul Chains
+:CONSUL_DNS_REDIRECT - [0:0]
+:CONSUL_PROXY_INBOUND - [0:0]
+:CONSUL_PROXY_IN_REDIRECT - [0:0]
+:CONSUL_PROXY_OUTPUT - [0:0]
+:CONSUL_PROXY_REDIRECT - [0:0]
+
+# Consul Input Redirect (Exception for SSH, Exception for Prometheus Monitoring, Exception for Consul RPC)
+-A PREROUTING -p tcp -j CONSUL_PROXY_INBOUND
+-A CONSUL_PROXY_INBOUND -p tcp -m tcp --dport 22 -j RETURN
+-A CONSUL_PROXY_INBOUND -p tcp -m tcp --dport 8301 -j RETURN
+-A CONSUL_PROXY_INBOUND -p udp -m udp --dport 8301 -j RETURN
+-A CONSUL_PROXY_INBOUND -j LOG --log-prefix "REDIRECT INPUT: "
+-A CONSUL_PROXY_INBOUND -p tcp -j CONSUL_PROXY_IN_REDIRECT
+-A CONSUL_PROXY_IN_REDIRECT -p tcp -j REDIRECT --to-ports 21000
+
+# Consul Output (Exception for localhost, Exception for User 9999, Rewrite DNS to localhost:8600,Rewrite DNS)
+-A OUTPUT -p tcp -j CONSUL_PROXY_OUTPUT
+-A CONSUL_PROXY_OUTPUT -d 127.0.0.1/32 -j RETURN
+-A CONSUL_PROXY_OUTPUT -m owner --uid-owner 9999 -j RETURN
+-A CONSUL_PROXY_OUTPUT -j LOG --log-prefix "REDIRECT OUTPUT: "
+-A CONSUL_PROXY_OUTPUT -j CONSUL_PROXY_REDIRECT
+-A CONSUL_PROXY_REDIRECT -p tcp -j REDIRECT --to-ports 15001
+
+COMMIT

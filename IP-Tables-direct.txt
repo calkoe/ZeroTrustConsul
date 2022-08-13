@@ -1,0 +1,31 @@
+# Calvin Köcher custom IP-Tables
+#
+# apt-get install iptables-persistent
+# nano /etc/iptables/rules.v4
+# iptables-restore < /etc/iptables/rules.v4
+# iptables --table nat -L 
+# tail -f /var/log/messages
+# sudo iptables -F --table filter
+# sudo iptables -F --table nat
+# sudo apt install resolvconf
+# sudo nano /etc/resolvconf/resolv.conf.d/head
+# nameserver 127.0.0.1
+# cat /etc/resolv.conf
+
+*filter
+# Default Policy
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# Consul Input Filter (Exception for SSH, Exception for Consul RPC, Exception for Envoy Sidecars)
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -i lo -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 8301 -j ACCEPT
+-A INPUT -p udp -m udp --dport 8301 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 21000:21255 -j ACCEPT
+-A INPUT -j LOG --log-prefix "DROPPED INPUT: "
+-A INPUT -j DROP
+
+COMMIT
